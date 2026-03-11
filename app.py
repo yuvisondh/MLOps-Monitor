@@ -1,8 +1,12 @@
 from flask import Flask, jsonify, request
 
+import os
 import pickle
 import numpy as np
 import sys
+
+
+import psycopg2
 
 app = Flask(__name__)
 
@@ -105,6 +109,12 @@ def predict():
     # Make prediction
     confidence = float(model.predict(features)[0,0])
     prediction = 1 if confidence > 0.5 else 0
+
+    try:
+        # Save request features + prediction output for monitoring/drift analysis.
+        log_prediction_to_db(result, prediction, confidence)
+    except Exception as e:
+        print(f"WARNING: Failed to log prediction to DB: {e}")
 
     # Return the prediction and confidence as JSON
     return jsonify({'prediction': prediction,
