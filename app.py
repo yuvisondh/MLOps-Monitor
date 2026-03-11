@@ -6,6 +6,12 @@ import sys
 
 app = Flask(__name__)
 
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_PORT = int(os.getenv("DB_PORT", "5432"))
+DB_NAME = os.getenv("DB_NAME", "mlops_monitor")
+DB_USER = os.getenv("DB_USER", "yuviss")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+
 try:
     # Load the model and scaler
     model = pickle.load(open('fraud_model.pkl', 'rb'))
