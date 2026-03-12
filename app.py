@@ -11,6 +11,8 @@ from evidently.legacy.metric_preset import DataDriftPreset
 import psycopg2
 
 app = Flask(__name__)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+REFERENCE_DATA_PATH = os.path.join(BASE_DIR, "reference_data.csv")
 
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = int(os.getenv("DB_PORT", "5432"))
@@ -66,6 +68,58 @@ def get_db_connection():
         user=DB_USER,
         password=DB_PASSWORD,
     )
+
+@app.route('/drift-report', methods=['GET'])
+def drift_report():
+    columns = ['Time','V1','V2','V3','V4','V5','V6','V7','V8','V9','V10',
+               'V11','V12','V13','V14','V15','V16','V17','V18','V19','V20',
+               'V21','V22','V23','V24','V25','V26','V27','V28','Amount']
+
+    if not os.path.exists(REFERENCE_DATA_PATH):
+        return jsonify({'error': f'Reference data file not found: {REFERENCE_DATA_PATH}'}), 500
+
+    try:
+        # Load reference data
+        reference = pd.read_csv(REFERENCE_DATA_PATH)
+
+        # Load recent predictions from database
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT time, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14,
+                   v15, v16, v17, v18, v19, v20, v21, v22, v23, v24, v25, v26, v27, v28, amount
+            FROM predictions
+            ORDER BY created_at DESC
+            LIMIT 100
+        """)
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        # Need at least 10 predictions to compare
+        if len(rows) < 10:
+            return jsonify({'error': 'Not enough predictions yet, need at least 10'}), 400
+
+        # Convert to dataframe with matching column names
+        current = pd.DataFrame(rows, columns=columns)
+        # Keep oldest-to-newest order for easier time-based interpretation.
+        current = current.iloc[::-1].reset_index(drop=True)
+
+        # Run Evidently drift report
+        report = Report(metrics=[DataDriftPreset()])
+        report.run(reference_data=reference[columns], current_data=current)
+
+        result = report.as_dict()
+        drift_result = result['metrics'][0]['result']
+
+        return jsonify({
+            'drift_detected': drift_result['dataset_drift'],
+            'num_predictions_analyzed': len(rows),
+            'number_of_drifted_columns': drift_result['number_of_drifted_columns'],
+            'share_of_drifted_columns': drift_result['share_of_drifted_columns']
+        })
+    except Exception as e:
+        return jsonify({'error': f'Failed to generate drift report: {str(e)}'}), 500
 
 
 def log_prediction_to_db(features_row, prediction, confidence):
