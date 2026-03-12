@@ -5,8 +5,8 @@ import pickle
 import numpy as np
 import sys
 import pandas as pd
-from evidently.report import Report
-from evidently.metric_preset import DataDriftPreset
+from evidently.legacy.report import Report
+from evidently.legacy.metric_preset import DataDriftPreset
 
 import psycopg2
 
