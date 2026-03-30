@@ -176,6 +176,32 @@ def predict():
     return jsonify({'prediction': prediction,
         'label': 'fraud' if prediction == 1 else 'legit',
         'confidence': confidence})
+
+@app.route('/predictions/recent', methods=['GET'])
+def recent_predictions():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, created_at, prediction, confidence, amount
+        FROM predictions
+        ORDER BY created_at DESC
+        LIMIT 20
+    """)
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return jsonify([
+        {
+            'id': row[0],
+            'timestamp': row[1].isoformat(),
+            'prediction': row[2],
+            'label': 'fraud' if row[2] == 1 else 'legit',
+            'confidence': row[3],
+            'amount': row[4]
+        }
+        for row in rows
+    ])
     
 
 
