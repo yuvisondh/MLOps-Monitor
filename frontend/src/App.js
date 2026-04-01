@@ -23,50 +23,73 @@ function App() {
 
   return (
     <div className="dashboard">
-      <h1>MLOps Monitoring Dashboard</h1>
-      <p>Model Status: {health ? '✅ Online' : '❌ Offline'}</p>
-      <section>
-      <h2>Recent Predictions</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Time</th>
-            <th>Label</th>
-            <th>Amount</th>
-            <th>Confidence</th>
-          </tr>
-        </thead>
-        <tbody>
-          {predictions.map(pred => (
-            <tr key={pred.id}>
-              <td>{pred.id}</td>
-              <td>{new Date(pred.timestamp).toLocaleString()}</td>
-              <td>{pred.label}</td>
-              <td>${pred.amount?.toFixed(2)}</td>
-              <td>{(pred.confidence * 100).toFixed(1)}%</td>
-            </tr>
-          ))}
-        </tbody>
+      <div className="dashboard-header">
+        <h1>MLOps Monitoring Dashboard</h1>
+        <span className={`status-badge ${health ? '' : 'offline'}`}>
+          {health ? '● Online' : '● Offline'}
+        </span>
+      </div>
 
-      </table>
-    </section>
-      <section>
-       <h2>Data Drift Status</h2>
-         {driftData ? (
-          <div>
-           <p>{driftData.drift_detected ? '⚠️ Drift Detected' : '✅ No Drift'}</p>
-           <p>Predictions analyzed: {driftData.num_predictions_analyzed}</p>
-           <p>Drifted columns: {driftData.number_of_drifted_columns} / 30</p>
-           <p>Drift share: {(driftData.share_of_drifted_columns * 100).toFixed(1)}%</p>
-         </div>
-     ) : (
-    <p>Loading drift data...</p>
-  )}
-    </section>
-      <section>
+      <section className="card">
+        <h2>Recent Predictions</h2>
+        <table className="predictions-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Time</th>
+              <th>Label</th>
+              <th>Amount</th>
+              <th>Confidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            {predictions.map(pred => (
+              <tr key={pred.id}>
+                <td>{pred.id}</td>
+                <td>{new Date(pred.timestamp).toLocaleString()}</td>
+                <td className={pred.label === 'fraud' ? 'label-fraud' : 'label-legit'}>
+                  {pred.label}
+                </td>
+                <td>${pred.amount?.toFixed(2)}</td>
+                <td>{(pred.confidence * 100).toFixed(1)}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <section className="card">
+        <h2>Data Drift Status</h2>
+        {driftData ? (
+          <>
+            <div className="drift-status">
+              <span className={`drift-badge ${driftData.drift_detected ? 'detected' : 'clear'}`}>
+                {driftData.drift_detected ? '⚠ Drift Detected' : '✓ No Drift'}
+              </span>
+            </div>
+            <div className="drift-metrics">
+              <div className="drift-metric">
+                <div className="metric-label">Predictions Analyzed</div>
+                <div className="metric-value">{driftData.num_predictions_analyzed}</div>
+              </div>
+              <div className="drift-metric">
+                <div className="metric-label">Drifted Columns</div>
+                <div className="metric-value">{driftData.number_of_drifted_columns} / 30</div>
+              </div>
+              <div className="drift-metric">
+                <div className="metric-label">Drift Share</div>
+                <div className="metric-value">{(driftData.share_of_drifted_columns * 100).toFixed(1)}%</div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <p>Loading drift data...</p>
+        )}
+      </section>
+      <section className="card">
         <h2>Confidence Over Time</h2>
-        <ResponsiveContainer width="100%" height={300}>
+        <div className="chart-wrapper">
+          <ResponsiveContainer width="100%" height="100%">
           <LineChart data={[...predictions].reverse()}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
@@ -90,6 +113,7 @@ function App() {
             />
           </LineChart>
         </ResponsiveContainer>
+        </div>
       </section>
     </div>
   )
