@@ -24,7 +24,32 @@ function App() {
     <div className="dashboard">
       <h1>MLOps Monitoring Dashboard</h1>
       <p>Model Status: {health ? '✅ Online' : '❌ Offline'}</p>
-      <p>Predictions loaded: {predictions.length}</p>
+      <section>
+      <h2>Recent Predictions</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Time</th>
+            <th>Label</th>
+            <th>Amount</th>
+            <th>Confidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          {predictions.map(pred => (
+            <tr key={pred.id}>
+              <td>{pred.id}</td>
+              <td>{new Date(pred.timestamp).toLocaleString()}</td>
+              <td>{pred.label}</td>
+              <td>${pred.amount?.toFixed(2)}</td>
+              <td>{(pred.confidence * 100).toFixed(1)}%</td>
+            </tr>
+          ))}
+        </tbody>
+
+      </table>
+    </section>
       <p>Drift: {driftData ? JSON.stringify(driftData) : 'Loading...'}</p>
     </div>
   )
