@@ -7,20 +7,109 @@ body {
   font-family: 'Segoe UI', system-ui, sans-serif;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+/* ── Layout ── */
+.dashboard {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+/* ── Header ── */
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #1e2536;
+  padding-bottom: 16px;
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+.dashboard-header h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #f8fafc;
+  letter-spacing: -0.3px;
+}
+
+.status-badge {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: #0d2b1f;
+  color: #34d399;
+  border: 1px solid #065f46;
+}
+
+.status-badge.offline {
+  background: #2b0d0d;
+  color: #f87171;
+  border-color: #7f1d1d;
+}
+
+/* ── Cards ── */
+.card {
+  background: #161b2e;
+  border: 1px solid #1e2536;
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.card h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 16px;
+}
+
+/* ── Predictions Table ── */
+.predictions-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.predictions-table th {
+  text-align: left;
+  padding: 10px 14px;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid #1e2536;
+}
+
+.predictions-table td {
+  padding: 11px 14px;
+  border-bottom: 1px solid #1a2030;
+  color: #cbd5e1;
+}
+
+.predictions-table tr:last-child td {
+  border-bottom: none;
+}
+
+.predictions-table tr:hover td {
+  background: #1a2235;
+}
+
+.label-fraud {
+  color: #f87171;
+  font-weight: 600;
+}
+
+.label-legit {
+  color: #34d399;
+  font-weight: 600;
+}
+
+/* ── Drift Card ── */
+.drift-status {
   display: flex;
   flex-direction: column;
   align-items: center;
