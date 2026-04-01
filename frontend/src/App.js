@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import './App.css'
 
-const API_BASE = 'http://localhost:5000'
+const API_BASE = 'http://127.0.0.1:5001'
 
 function App() {
   const [predictions, setPredictions] = useState([])
@@ -31,3 +31,4 @@ function App() {
 }
 
 export default App
+
