@@ -50,7 +50,19 @@ function App() {
 
       </table>
     </section>
-      <p>Drift: {driftData ? JSON.stringify(driftData) : 'Loading...'}</p>
+      <section>
+       <h2>Data Drift Status</h2>
+         {driftData ? (
+          <div>
+           <p>{driftData.drift_detected ? '⚠️ Drift Detected' : '✅ No Drift'}</p>
+           <p>Predictions analyzed: {driftData.num_predictions_analyzed}</p>
+           <p>Drifted columns: {driftData.number_of_drifted_columns} / 30</p>
+           <p>Drift share: {(driftData.share_of_drifted_columns * 100).toFixed(1)}%</p>
+         </div>
+     ) : (
+    <p>Loading drift data...</p>
+  )}
+    </section>
     </div>
   )
 }
