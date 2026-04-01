@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import './App.css'
 
 const API_BASE = 'http://127.0.0.1:5001'
@@ -63,6 +64,33 @@ function App() {
     <p>Loading drift data...</p>
   )}
     </section>
+      <section>
+        <h2>Confidence Over Time</h2>
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={[...predictions].reverse()}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis
+              dataKey="id"
+              label={{ value: 'Prediction ID', position: 'insideBottom', offset: -2 }}
+            />
+            <YAxis
+              domain={[0, 1]}
+              tickFormatter={v => `${(v * 100).toFixed(0)}%`}
+            />
+            <Tooltip
+              formatter={v => `${(v * 100).toFixed(1)}%`}
+              labelFormatter={id => `Prediction #${id}`}
+            />
+            <Line
+              type="monotone"
+              dataKey="confidence"
+              stroke="#3b82f6"
+              dot={false}
+              strokeWidth={2}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </section>
     </div>
   )
 }
