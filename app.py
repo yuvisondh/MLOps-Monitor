@@ -9,8 +9,10 @@ from evidently.legacy.report import Report
 from evidently.legacy.metric_preset import DataDriftPreset
 
 import psycopg2
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app, origins=["http://localhost:3000", "http://127.0.0.1:3000"])
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 REFERENCE_DATA_PATH = os.path.join(BASE_DIR, "reference_data.csv")
 
