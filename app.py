@@ -11,10 +11,26 @@ from evidently.legacy.metric_preset import DataDriftPreset
 import psycopg2
 from flask_cors import CORS
 
+
+def _parse_cors_origins(value):
+    return [origin.strip() for origin in value.split(',') if origin.strip()]
+
+
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:3000", "http://127.0.0.1:3000"])
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-REFERENCE_DATA_PATH = os.path.join(BASE_DIR, "reference_data.csv")
+
+CORS_ORIGINS = _parse_cors_origins(
+    os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:3000,http://127.0.0.1:3000",
+    )
+)
+CORS(app, origins=CORS_ORIGINS)
+
+MODEL_PATH = os.getenv("MODEL_PATH", os.path.join(BASE_DIR, "fraud_model.pkl"))
+SCALER_PATH = os.getenv("SCALER_PATH", os.path.join(BASE_DIR, "scaler.pkl"))
+REFERENCE_DATA_PATH = os.getenv("REFERENCE_DATA_PATH", os.path.join(BASE_DIR, "reference_data.csv"))
+DATABASE_URL = os.getenv("DATABASE_URL", "")
 
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = int(os.getenv("DB_PORT", "5432"))
@@ -22,11 +38,12 @@ DB_NAME = os.getenv("DB_NAME", "mlops_monitor")
 DB_USER = os.getenv("DB_USER", "yuviss")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 PREDICTION_THRESHOLD = float(os.getenv("PREDICTION_THRESHOLD", "0.5"))
+APP_PORT = int(os.getenv("PORT", "5001"))
 
 try:
     # Load the model and scaler
-    model = pickle.load(open('fraud_model.pkl', 'rb'))
-    scaler = pickle.load(open('scaler.pkl', 'rb'))
+    model = pickle.load(open(MODEL_PATH, 'rb'))
+    scaler = pickle.load(open(SCALER_PATH, 'rb'))
 except FileNotFoundError as e:
     print(f"ERROR: Model file not found: {e}")
     sys.exit(1)  # Stop the app
@@ -64,6 +81,9 @@ def validate_features(data):
 
 
 def get_db_connection():
+    if DATABASE_URL:
+        return psycopg2.connect(DATABASE_URL)
+
     return psycopg2.connect(
         host=DB_HOST,
         port=DB_PORT,
@@ -71,6 +91,57 @@ def get_db_connection():
         user=DB_USER,
         password=DB_PASSWORD,
     )
+
+
+def initialize_database():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS predictions (
+            id SERIAL PRIMARY KEY,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            time DOUBLE PRECISION,
+            v1 DOUBLE PRECISION,
+            v2 DOUBLE PRECISION,
+            v3 DOUBLE PRECISION,
+            v4 DOUBLE PRECISION,
+            v5 DOUBLE PRECISION,
+            v6 DOUBLE PRECISION,
+            v7 DOUBLE PRECISION,
+            v8 DOUBLE PRECISION,
+            v9 DOUBLE PRECISION,
+            v10 DOUBLE PRECISION,
+            v11 DOUBLE PRECISION,
+            v12 DOUBLE PRECISION,
+            v13 DOUBLE PRECISION,
+            v14 DOUBLE PRECISION,
+            v15 DOUBLE PRECISION,
+            v16 DOUBLE PRECISION,
+            v17 DOUBLE PRECISION,
+            v18 DOUBLE PRECISION,
+            v19 DOUBLE PRECISION,
+            v20 DOUBLE PRECISION,
+            v21 DOUBLE PRECISION,
+            v22 DOUBLE PRECISION,
+            v23 DOUBLE PRECISION,
+            v24 DOUBLE PRECISION,
+            v25 DOUBLE PRECISION,
+            v26 DOUBLE PRECISION,
+            v27 DOUBLE PRECISION,
+            v28 DOUBLE PRECISION,
+            amount DOUBLE PRECISION,
+            prediction INT NOT NULL,
+            confidence DOUBLE PRECISION NOT NULL
+        )
+        """
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+initialize_database()
 
 @app.route('/drift-report', methods=['GET'])
 def drift_report():
@@ -257,5 +328,5 @@ def health():
 
 
 if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=5001)
+    app.run(host='0.0.0.0', port=APP_PORT)
 
