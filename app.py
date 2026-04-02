@@ -21,6 +21,7 @@ DB_PORT = int(os.getenv("DB_PORT", "5432"))
 DB_NAME = os.getenv("DB_NAME", "mlops_monitor")
 DB_USER = os.getenv("DB_USER", "yuviss")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+PREDICTION_THRESHOLD = float(os.getenv("PREDICTION_THRESHOLD", "0.5"))
 
 try:
     # Load the model and scaler
@@ -166,7 +167,7 @@ def predict():
 
     # Make prediction
     confidence = float(model.predict(features)[0,0])
-    prediction = 1 if confidence > 0.5 else 0
+    prediction = 1 if confidence >= PREDICTION_THRESHOLD else 0
 
     try:
         # Save request features + prediction output for monitoring/drift analysis.
@@ -177,18 +178,27 @@ def predict():
     # Return the prediction and confidence as JSON
     return jsonify({'prediction': prediction,
         'label': 'fraud' if prediction == 1 else 'legit',
-        'confidence': confidence})
+        'confidence': confidence,
+        'threshold': PREDICTION_THRESHOLD})
 
 @app.route('/predictions/recent', methods=['GET'])
 def recent_predictions():
+    limit = request.args.get('limit', default=20, type=int)
+    if limit is None:
+        limit = 20
+    limit = max(1, min(limit, 500))
+
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("""
+    cur.execute(
+        """
         SELECT id, created_at, prediction, confidence, amount
         FROM predictions
         ORDER BY created_at DESC
-        LIMIT 20
-    """)
+        LIMIT %s
+        """,
+        (limit,),
+    )
     rows = cur.fetchall()
     cur.close()
     conn.close()
@@ -204,6 +214,40 @@ def recent_predictions():
         }
         for row in rows
     ])
+
+
+@app.route('/metrics/summary', methods=['GET'])
+def metrics_summary():
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    cur.execute("SELECT COUNT(*) FROM predictions")
+    total_predictions = int(cur.fetchone()[0])
+
+    cur.execute(
+        """
+        SELECT
+            COUNT(*) AS rows_24h,
+            AVG(confidence) AS avg_confidence_24h,
+            AVG(CASE WHEN prediction = 1 THEN 1.0 ELSE 0.0 END) AS fraud_rate_24h
+        FROM predictions
+        WHERE created_at >= NOW() - INTERVAL '24 hours'
+        """
+    )
+    rows_24h, avg_confidence_24h, fraud_rate_24h = cur.fetchone()
+
+    cur.close()
+    conn.close()
+
+    return jsonify(
+        {
+            'threshold': PREDICTION_THRESHOLD,
+            'total_predictions': total_predictions,
+            'predictions_last_24h': int(rows_24h or 0),
+            'avg_confidence_last_24h': float(avg_confidence_24h or 0.0),
+            'fraud_rate_last_24h': float(fraud_rate_24h or 0.0),
+        }
+    )
     
 
 
