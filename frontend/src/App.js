@@ -1,25 +1,103 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+} from 'recharts'
 import './App.css'
 
 const API_BASE = 'http://127.0.0.1:5001'
+const DEFAULT_V_VALUES = Array(28).fill(0).join(', ')
 
 function App() {
   const [predictions, setPredictions] = useState([])
   const [driftData, setDriftData] = useState(null)
+  const [summaryData, setSummaryData] = useState(null)
   const [health, setHealth] = useState(false)
+  const [apiError, setApiError] = useState('')
+  const [formTime, setFormTime] = useState('1000')
+  const [formAmount, setFormAmount] = useState('50')
+  const [formVValues, setFormVValues] = useState(DEFAULT_V_VALUES)
+  const [lastPrediction, setLastPrediction] = useState(null)
+
+  const fetchDashboardData = async () => {
+    try {
+      setApiError('')
+      const [healthRes, predsRes, driftRes, summaryRes] = await Promise.all([
+        axios.get(`${API_BASE}/health`),
+        axios.get(`${API_BASE}/predictions/recent?limit=200`),
+        axios.get(`${API_BASE}/drift-report`),
+        axios.get(`${API_BASE}/metrics/summary`),
+      ])
+
+      setHealth(healthRes.data.status === 'ok')
+      setPredictions(predsRes.data)
+      setDriftData(driftRes.data)
+      setSummaryData(summaryRes.data)
+    } catch (err) {
+      setApiError(err.message || 'Failed to load dashboard data')
+      setHealth(false)
+    }
+  }
 
   useEffect(() => {
-    axios.get(`${API_BASE}/health`)
-      .then(res => setHealth(res.data.status === 'ok'))
-
-    axios.get(`${API_BASE}/predictions/recent`)
-      .then(res => setPredictions(res.data))
-
-    axios.get(`${API_BASE}/drift-report`)
-      .then(res => setDriftData(res.data))
+    fetchDashboardData()
   }, [])
+
+  const buildHistogramData = () => {
+    const bins = Array.from({ length: 10 }, (_, idx) => ({
+      range: `${idx * 10}-${(idx + 1) * 10}%`,
+      count: 0,
+    }))
+
+    predictions.forEach(pred => {
+      const rawIndex = Math.floor(pred.confidence * 10)
+      const index = Math.max(0, Math.min(9, rawIndex))
+      bins[index].count += 1
+    })
+
+    return bins
+  }
+
+  const submitPrediction = async e => {
+    e.preventDefault()
+
+    const parsedTime = Number(formTime)
+    const parsedAmount = Number(formAmount)
+    const parsedVValues = formVValues
+      .split(',')
+      .map(v => Number(v.trim()))
+      .filter(v => !Number.isNaN(v))
+
+    if (Number.isNaN(parsedTime) || Number.isNaN(parsedAmount)) {
+      setApiError('Time and Amount must be valid numbers.')
+      return
+    }
+
+    if (parsedVValues.length !== 28) {
+      setApiError('Please provide exactly 28 comma-separated V1-V28 values.')
+      return
+    }
+
+    try {
+      setApiError('')
+      const features = [parsedTime, ...parsedVValues, parsedAmount]
+      const res = await axios.post(`${API_BASE}/predict`, { features })
+      setLastPrediction(res.data)
+      fetchDashboardData()
+    } catch (err) {
+      setApiError(err.response?.data?.error || err.message || 'Prediction request failed')
+    }
+  }
+
+  const histogramData = buildHistogramData()
 
   return (
     <div className="dashboard">
@@ -29,6 +107,60 @@ function App() {
           {health ? '● Online' : '● Offline'}
         </span>
       </div>
+
+      {apiError && <p className="error-banner">{apiError}</p>}
+
+      <section className="card">
+        <h2>Quick Prediction</h2>
+        <form className="prediction-form" onSubmit={submitPrediction}>
+          <div className="form-grid">
+            <label>
+              Time
+              <input type="number" value={formTime} onChange={e => setFormTime(e.target.value)} />
+            </label>
+            <label>
+              Amount
+              <input type="number" value={formAmount} onChange={e => setFormAmount(e.target.value)} />
+            </label>
+          </div>
+          <label>
+            V1-V28 (comma-separated)
+            <textarea
+              rows="3"
+              value={formVValues}
+              onChange={e => setFormVValues(e.target.value)}
+            />
+          </label>
+          <button type="submit">Run Prediction</button>
+        </form>
+        {lastPrediction && (
+          <div className="prediction-result">
+            <strong>Latest Result:</strong> {lastPrediction.label} ({(lastPrediction.confidence * 100).toFixed(2)}%)
+          </div>
+        )}
+      </section>
+
+      <section className="card">
+        <h2>Model Summary</h2>
+        {summaryData ? (
+          <div className="drift-metrics">
+            <div className="drift-metric">
+              <div className="metric-label">Threshold</div>
+              <div className="metric-value">{summaryData.threshold}</div>
+            </div>
+            <div className="drift-metric">
+              <div className="metric-label">Avg Confidence (24h)</div>
+              <div className="metric-value">{(summaryData.avg_confidence_last_24h * 100).toFixed(2)}%</div>
+            </div>
+            <div className="drift-metric">
+              <div className="metric-label">Fraud Rate (24h)</div>
+              <div className="metric-value">{(summaryData.fraud_rate_last_24h * 100).toFixed(2)}%</div>
+            </div>
+          </div>
+        ) : (
+          <p>Loading summary...</p>
+        )}
+      </section>
 
       <section className="card">
         <h2>Recent Predictions</h2>
@@ -43,7 +175,7 @@ function App() {
             </tr>
           </thead>
           <tbody>
-            {predictions.map(pred => (
+            {predictions.slice(0, 20).map(pred => (
               <tr key={pred.id}>
                 <td>{pred.id}</td>
                 <td>{new Date(pred.timestamp).toLocaleString()}</td>
@@ -90,29 +222,44 @@ function App() {
         <h2>Confidence Over Time</h2>
         <div className="chart-wrapper">
           <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={[...predictions].reverse()}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis
-              dataKey="id"
-              label={{ value: 'Prediction ID', position: 'insideBottom', offset: -2 }}
-            />
-            <YAxis
-              domain={[0, 1]}
-              tickFormatter={v => `${(v * 100).toFixed(0)}%`}
-            />
-            <Tooltip
-              formatter={v => `${(v * 100).toFixed(1)}%`}
-              labelFormatter={id => `Prediction #${id}`}
-            />
-            <Line
-              type="monotone"
-              dataKey="confidence"
-              stroke="#3b82f6"
-              dot={false}
-              strokeWidth={2}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+            <LineChart data={[...predictions].reverse()}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis
+                dataKey="id"
+                label={{ value: 'Prediction ID', position: 'insideBottom', offset: -2 }}
+              />
+              <YAxis
+                domain={[0, 1]}
+                tickFormatter={v => `${(v * 100).toFixed(0)}%`}
+              />
+              <Tooltip
+                formatter={v => `${(v * 100).toFixed(1)}%`}
+                labelFormatter={id => `Prediction #${id}`}
+              />
+              <Line
+                type="monotone"
+                dataKey="confidence"
+                stroke="#3b82f6"
+                dot={false}
+                strokeWidth={2}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </section>
+
+      <section className="card">
+        <h2>Confidence Histogram</h2>
+        <div className="chart-wrapper">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={histogramData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="range" />
+              <YAxis allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="count" fill="#22c55e" />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </section>
     </div>
