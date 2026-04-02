@@ -8,6 +8,11 @@ and detects when incoming data drifts from the training distribution.
 **Live Dashboard:** https://mlops-monitor.vercel.app
 **Live API:** https://mlops-api-k3r7.onrender.com/health
 
+
+## Demo
+
+[▶ Watch the demo on Loom](https://www.loom.com/share/4efe66e0048949ffb12e40132f844394)
+
 ---
 
 ## What It Does
