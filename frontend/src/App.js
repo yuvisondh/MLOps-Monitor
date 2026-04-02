@@ -48,8 +48,10 @@ function App() {
   }
 
   useEffect(() => {
-    fetchDashboardData()
-  }, [])
+  fetchDashboardData()
+  const interval = setInterval(fetchDashboardData, 30000)
+  return () => clearInterval(interval)
+}, [])
 
   const buildHistogramData = () => {
     const bins = Array.from({ length: 10 }, (_, idx) => ({
