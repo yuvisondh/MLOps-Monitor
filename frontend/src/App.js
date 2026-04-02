@@ -15,6 +15,9 @@ import './App.css'
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:5001'
 const DEFAULT_V_VALUES = Array(28).fill(0).join(', ')
+const HEALTH_RETRY_DELAYS_MS = [0, 2000, 5000]
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
 function App() {
   const [predictions, setPredictions] = useState([])
@@ -27,29 +30,59 @@ function App() {
   const [formVValues, setFormVValues] = useState(DEFAULT_V_VALUES)
   const [lastPrediction, setLastPrediction] = useState(null)
 
-  const fetchDashboardData = async () => {
-    try {
-      setApiError('')
-      const [healthRes, predsRes, summaryRes] = await Promise.all([
-        axios.get(`${API_BASE}/health`),
-        axios.get(`${API_BASE}/predictions/recent?limit=200`),
-        axios.get(`${API_BASE}/metrics/summary`),
-      ])
-
-      setHealth(healthRes.data.status === 'ok')
-      setPredictions(predsRes.data)
-      setSummaryData(summaryRes.data)
-
-      // drift is optional — don't let it crash the dashboard
-      try {
-        const driftRes = await axios.get(`${API_BASE}/drift-report`)
-        setDriftData(driftRes.data)
-      } catch {
-        setDriftData(null)
+  const fetchHealthWithRetry = async () => {
+    for (const delayMs of HEALTH_RETRY_DELAYS_MS) {
+      if (delayMs > 0) {
+        await sleep(delayMs)
       }
-    } catch (err) {
-      setApiError(err.message || 'Failed to load dashboard data')
+
+      try {
+        const healthRes = await axios.get(`${API_BASE}/health`, { timeout: 10000 })
+        if (healthRes.data.status === 'ok') {
+          return true
+        }
+      } catch {
+        // Keep retrying; Render can take time to wake from cold start.
+      }
+    }
+
+    return false
+  }
+
+  const fetchDashboardData = async () => {
+    setApiError('')
+
+    const isHealthy = await fetchHealthWithRetry()
+    setHealth(isHealthy)
+
+    if (!isHealthy) {
+      setApiError('API is offline or waking up. Try again in a few seconds.')
       setHealth(false)
+      return
+    }
+
+    const [predsResult, summaryResult, driftResult] = await Promise.allSettled([
+      axios.get(`${API_BASE}/predictions/recent?limit=200`),
+      axios.get(`${API_BASE}/metrics/summary`),
+      axios.get(`${API_BASE}/drift-report`),
+    ])
+
+    if (predsResult.status === 'fulfilled') {
+      setPredictions(predsResult.value.data)
+    }
+
+    if (summaryResult.status === 'fulfilled') {
+      setSummaryData(summaryResult.value.data)
+    }
+
+    if (driftResult.status === 'fulfilled') {
+      setDriftData(driftResult.value.data)
+    } else {
+      setDriftData(null)
+    }
+
+    if (predsResult.status === 'rejected' || summaryResult.status === 'rejected') {
+      setApiError('Connected to API, but some dashboard sections failed to load. Auto-refresh will retry.')
     }
   }
 
