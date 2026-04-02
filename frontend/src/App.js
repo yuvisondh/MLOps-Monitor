@@ -30,17 +30,23 @@ function App() {
   const fetchDashboardData = async () => {
     try {
       setApiError('')
-      const [healthRes, predsRes, driftRes, summaryRes] = await Promise.all([
+      const [healthRes, predsRes, summaryRes] = await Promise.all([
         axios.get(`${API_BASE}/health`),
         axios.get(`${API_BASE}/predictions/recent?limit=200`),
-        axios.get(`${API_BASE}/drift-report`),
         axios.get(`${API_BASE}/metrics/summary`),
       ])
 
       setHealth(healthRes.data.status === 'ok')
       setPredictions(predsRes.data)
-      setDriftData(driftRes.data)
       setSummaryData(summaryRes.data)
+
+      // drift is optional — don't let it crash the dashboard
+      try {
+        const driftRes = await axios.get(`${API_BASE}/drift-report`)
+        setDriftData(driftRes.data)
+      } catch {
+        setDriftData(null)
+      }
     } catch (err) {
       setApiError(err.message || 'Failed to load dashboard data')
       setHealth(false)
@@ -232,7 +238,9 @@ function App() {
             </div>
           </>
         ) : (
-          <p>Loading drift data...</p>
+          <p style={{ color: 'var(--color-text-secondary)' }}>
+            Not enough predictions yet — send at least 10 transactions to enable drift detection.
+          </p>
         )}
       </section>
       <section className="card">
