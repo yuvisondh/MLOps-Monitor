@@ -22,7 +22,7 @@ function App() {
   const [summaryData, setSummaryData] = useState(null)
   const [health, setHealth] = useState(false)
   const [apiError, setApiError] = useState('')
-  const [formTime, setFormTime] = useState('1000')
+  const [formTime, setFormTime] = useState('00:30')
   const [formAmount, setFormAmount] = useState('50')
   const [formVValues, setFormVValues] = useState(DEFAULT_V_VALUES)
   const [lastPrediction, setLastPrediction] = useState(null)
@@ -69,15 +69,24 @@ function App() {
   const submitPrediction = async e => {
     e.preventDefault()
 
-    const parsedTime = Number(formTime)
+    const [hoursText, minutesText] = formTime.split(':')
+    const parsedHours = Number(hoursText)
+    const parsedMinutes = Number(minutesText)
     const parsedAmount = Number(formAmount)
     const parsedVValues = formVValues
       .split(',')
       .map(v => Number(v.trim()))
       .filter(v => !Number.isNaN(v))
 
-    if (Number.isNaN(parsedTime) || Number.isNaN(parsedAmount)) {
-      setApiError('Time and Amount must be valid numbers.')
+    const parsedTime = (parsedHours * 3600) + (parsedMinutes * 60)
+
+    if (Number.isNaN(parsedHours) || Number.isNaN(parsedMinutes) || Number.isNaN(parsedAmount)) {
+      setApiError('Time (HH:MM) and amount must be valid numbers.')
+      return
+    }
+
+    if (parsedHours < 0 || parsedHours > 23 || parsedMinutes < 0 || parsedMinutes > 59) {
+      setApiError('Use valid military time from 00:00 to 23:59.')
       return
     }
 
@@ -115,14 +124,20 @@ function App() {
         <form className="prediction-form" onSubmit={submitPrediction}>
           <div className="form-grid">
             <label>
-              Time
-              <input type="number" value={formTime} onChange={e => setFormTime(e.target.value)} />
+              Transaction Time (24h)
+              <input type="time" value={formTime} onChange={e => setFormTime(e.target.value)} />
             </label>
             <label>
               Amount
               <input type="number" value={formAmount} onChange={e => setFormAmount(e.target.value)} />
             </label>
           </div>
+          <p className="time-help-text">
+            Model Time value sent: {(() => {
+              const [h = '0', m = '0'] = (formTime || '00:00').split(':')
+              return (Number(h) * 3600) + (Number(m) * 60)
+            })()} seconds
+          </p>
           <label>
             V1-V28 (comma-separated)
             <textarea
