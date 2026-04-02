@@ -192,6 +192,11 @@ body {
   font-size: 0.85rem;
 }
 
+.time-help-text {
+  color: #7dd3fc;
+  font-size: 0.82rem;
+}
+
 .prediction-form input,
 .prediction-form textarea {
   background: #0f1117;
