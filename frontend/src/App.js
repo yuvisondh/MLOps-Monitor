@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
 import {
   LineChart,
@@ -49,7 +49,7 @@ function App() {
     return false
   }
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     setApiError('')
 
     const isHealthy = await fetchHealthWithRetry()
@@ -84,13 +84,13 @@ function App() {
     if (predsResult.status === 'rejected' || summaryResult.status === 'rejected') {
       setApiError('Connected to API, but some dashboard sections failed to load. Auto-refresh will retry.')
     }
-  }
+  }, [])
 
   useEffect(() => {
   fetchDashboardData()
   const interval = setInterval(fetchDashboardData, 30000)
   return () => clearInterval(interval)
-}, [])
+}, [fetchDashboardData])
 
   const buildHistogramData = () => {
     const bins = Array.from({ length: 10 }, (_, idx) => ({
