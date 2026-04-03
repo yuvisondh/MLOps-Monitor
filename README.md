@@ -13,6 +13,9 @@ without needing to understand PCA features.
 **Live API:** https://mlops-api-k3r7.onrender.com/health
 
 
+## Demo
+
+[▶ Watch the demo on Loom](https://www.loom.com/share/ed82c705628d44c8a5bad190227833a4)
 
 ---
 
