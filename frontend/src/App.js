@@ -18,6 +18,11 @@ const WAKE_RETRY_DELAYS_MS = [0, 3000, 6000, 10000, 15000, 20000]
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
+// Raw model output is fraud probability (0 = legit, 1 = fraud).
+// Display confidence = how sure the model is about the label it picked.
+const displayConfidence = (fraudProb, label) =>
+  label === 'fraud' ? fraudProb : 1 - fraudProb
+
 const SAMPLE_TRANSACTIONS = [
   {
     name: 'Legitimate — Small Purchase',
@@ -130,7 +135,8 @@ function App() {
     }))
 
     predictions.forEach(pred => {
-      const rawIndex = Math.floor(pred.confidence * 10)
+      const conf = displayConfidence(pred.confidence, pred.label)
+      const rawIndex = Math.floor(conf * 10)
       const index = Math.max(0, Math.min(9, rawIndex))
       bins[index].count += 1
     })
@@ -222,7 +228,7 @@ function App() {
               <div className="metric-value">{summaryData.threshold}</div>
             </div>
             <div className="drift-metric">
-              <div className="metric-label">Avg Confidence (24h)</div>
+              <div className="metric-label">Avg Fraud Probability (24h)</div>
               <div className="metric-value">{(summaryData.avg_confidence_last_24h * 100).toFixed(2)}%</div>
             </div>
             <div className="drift-metric">
@@ -310,7 +316,7 @@ function App() {
         </form>
         {lastPrediction && (
           <div className="prediction-result">
-            <strong>Latest Result:</strong> {lastPrediction.label} ({(lastPrediction.confidence * 100).toFixed(2)}%)
+            <strong>Latest Result:</strong> {lastPrediction.label} ({(displayConfidence(lastPrediction.confidence, lastPrediction.label) * 100).toFixed(2)}% confidence)
           </div>
         )}
       </section>
@@ -337,7 +343,7 @@ function App() {
                     {pred.label}
                   </td>
                   <td>${pred.amount?.toFixed(2)}</td>
-                  <td>{(pred.confidence * 100).toFixed(1)}%</td>
+                  <td>{(displayConfidence(pred.confidence, pred.label) * 100).toFixed(1)}%</td>
                 </tr>
               ))}
             </tbody>
@@ -349,7 +355,7 @@ function App() {
         <h2>Confidence Over Time</h2>
         <div className="chart-wrapper">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={[...predictions].reverse()}>
+            <LineChart data={[...predictions].reverse().map(p => ({ ...p, displayConf: displayConfidence(p.confidence, p.label) }))}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis
                 dataKey="id"
@@ -365,7 +371,7 @@ function App() {
               />
               <Line
                 type="monotone"
-                dataKey="confidence"
+                dataKey="displayConf"
                 stroke="#3b82f6"
                 dot={false}
                 strokeWidth={2}
