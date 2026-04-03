@@ -13,9 +13,6 @@ without needing to understand PCA features.
 **Live API:** https://mlops-api-k3r7.onrender.com/health
 
 
-## Demo
-
-[▶ Watch the demo on Loom](https://www.loom.com/share/4efe66e0048949ffb12e40132f844394)
 
 ---
 
@@ -33,8 +30,8 @@ without needing to understand PCA features.
 
 ## Dashboard
 
-![Dashboard Top](assets/dashboard-top.png)
-![Dashboard Bottom](assets/dashboard-bottom.png)
+![Dashboard Top](assets/dashboard-top.png?v=2)
+![Dashboard Bottom](assets/dashboard-bottom.png?v=2)
 
 ## Architecture
 ```
