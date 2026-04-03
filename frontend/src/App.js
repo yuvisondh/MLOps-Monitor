@@ -14,7 +14,20 @@ import {
 import './App.css'
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:5001'
-const WAKE_RETRY_DELAYS_MS = [0, 3000, 6000, 10000, 15000, 20000]
+
+// Render free-tier cold starts can take 60–180 s.  Strategy: a few quick
+// pings (short timeout) followed by progressively longer waits so we don't
+// give up before the server finishes booting.
+const WAKE_STEPS = [
+  { delay: 0,     timeout: 10000 },   // instant ping
+  { delay: 3000,  timeout: 10000 },
+  { delay: 6000,  timeout: 10000 },
+  { delay: 10000, timeout: 30000 },   // server may still be booting
+  { delay: 15000, timeout: 30000 },
+  { delay: 20000, timeout: 60000 },   // long wait — covers ~120 s cold start
+  { delay: 30000, timeout: 60000 },   // ~180 s cumulative
+  { delay: 40000, timeout: 60000 },   // safety net
+]
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -64,20 +77,20 @@ function App() {
   }
 
   const fetchHealthWithRetry = async () => {
-    for (let i = 0; i < WAKE_RETRY_DELAYS_MS.length; i++) {
-      const delayMs = WAKE_RETRY_DELAYS_MS[i]
-      if (delayMs > 0) {
-        await sleep(delayMs)
+    for (let i = 0; i < WAKE_STEPS.length; i++) {
+      const { delay, timeout } = WAKE_STEPS[i]
+      if (delay > 0) {
+        await sleep(delay)
       }
       setWakeAttempt(i + 1)
 
       try {
-        const healthRes = await axios.get(`${API_BASE}/health`, { timeout: 10000 })
+        const healthRes = await axios.get(`${API_BASE}/health`, { timeout })
         if (healthRes.data.status === 'ok') {
           return true
         }
       } catch {
-        // Render free tier can take up to 60s to wake from cold start.
+        // Render free tier can take up to 2-3 min to wake from cold start.
       }
     }
 
@@ -200,7 +213,7 @@ function App() {
           <div className="wake-spinner" />
           <div>
             <strong>Waking up the API...</strong>
-            <p>The backend runs on Render's free tier and sleeps after inactivity. This usually takes 30–60 seconds. (Attempt {wakeAttempt}/{WAKE_RETRY_DELAYS_MS.length})</p>
+            <p>The backend runs on Render's free tier and sleeps after inactivity. Cold starts typically take 1–2 minutes — hang tight! (Attempt {wakeAttempt}/{WAKE_STEPS.length})</p>
           </div>
         </div>
       )}
