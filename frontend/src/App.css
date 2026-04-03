@@ -9,12 +9,40 @@ body {
 
 /* ── Layout ── */
 .dashboard {
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 32px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 28px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+/* Full-width items span both columns */
+.dashboard-header,
+.wake-banner,
+.error-banner,
+.info-banner {
+  grid-column: 1 / -1;
+}
+
+/* Card grid placement */
+.card-summary  { grid-column: 1; }
+.card-drift    { grid-column: 2; }
+.card-predict  { grid-column: 1; }
+.card-table    { grid-column: 2; }
+.card-chart-line { grid-column: 1; }
+.card-chart-bar  { grid-column: 2; }
+
+/* Let the table card scroll if many rows */
+.table-scroll {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+/* Make predict + table same row align */
+.card-predict,
+.card-table {
+  align-self: start;
 }
 
 .error-banner {
@@ -23,6 +51,68 @@ body {
   border: 1px solid #7f1d1d;
   border-radius: 10px;
   padding: 10px 14px;
+}
+
+/* ── Wake-up Banner ── */
+.wake-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #1a1c2e;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 16px 18px;
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.wake-banner strong {
+  color: #e2e8f0;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.wake-banner p {
+  margin: 0;
+}
+
+.wake-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #334155;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.inline-link-btn {
+  background: none;
+  border: none;
+  color: #60a5fa;
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: inherit;
+  padding: 0;
+}
+
+/* ── Info Banner ── */
+.info-banner {
+  background: #0d1f3c;
+  color: #93c5fd;
+  border: 1px solid #1e3a5f;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.info-banner strong {
+  color: #bfdbfe;
 }
 
 /* ── Header ── */
@@ -146,8 +236,13 @@ body {
 .drift-metrics {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  gap: 12px;
   margin-top: 4px;
+}
+
+.card-summary .drift-metrics,
+.card-drift .drift-metrics {
+  grid-template-columns: 1fr 1fr 1fr;
 }
 
 .drift-metric {
@@ -192,9 +287,80 @@ body {
   font-size: 0.85rem;
 }
 
-.time-help-text {
-  color: #7dd3fc;
-  font-size: 0.82rem;
+/* ── Preset Buttons ── */
+.preset-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.preset-btn {
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.preset-btn-0 {
+  background: #0d2b1f;
+  color: #34d399;
+  border-color: #065f46;
+}
+.preset-btn-0:hover { background: #134e35; }
+
+.preset-btn-1 {
+  background: #2b2200;
+  color: #fbbf24;
+  border-color: #854d0e;
+}
+.preset-btn-1:hover { background: #422e06; }
+
+.preset-btn-2 {
+  background: #2b0d0d;
+  color: #f87171;
+  border-color: #7f1d1d;
+}
+.preset-btn-2:hover { background: #451010; }
+
+/* ── V-Details Collapsible ── */
+.v-details {
+  border: 1px solid #1e2536;
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.v-details summary {
+  color: #64748b;
+  font-size: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.v-details[open] summary {
+  margin-bottom: 10px;
+}
+
+.v-help-text {
+  color: #64748b;
+  font-size: 0.8rem;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.v-details textarea {
+  width: 100%;
+  background: #0f1117;
+  border: 1px solid #334155;
+  color: #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  resize: vertical;
 }
 
 .prediction-form input,
@@ -222,6 +388,12 @@ body {
   background: #1d4ed8;
 }
 
+.prediction-form button:disabled {
+  background: #334155;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
 .prediction-result {
   margin-top: 10px;
   color: #93c5fd;
@@ -234,19 +406,35 @@ body {
   margin-top: 8px;
 }
 
-@media (max-width: 900px) {
-  .drift-metrics {
+@media (max-width: 1024px) {
+  .dashboard {
     grid-template-columns: 1fr;
   }
 
-  .form-grid {
-    grid-template-columns: 1fr;
+  .dashboard-header,
+  .wake-banner,
+  .error-banner,
+  .info-banner,
+  .card-summary,
+  .card-drift,
+  .card-predict,
+  .card-table,
+  .card-chart-line,
+  .card-chart-bar {
+    grid-column: 1;
+  }
+
+  .drift-metrics,
+  .card-summary .drift-metrics,
+  .card-drift .drift-metrics {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
 @media (max-width: 700px) {
   .dashboard {
     padding: 20px 12px;
+    gap: 16px;
   }
 
   .card {
@@ -259,7 +447,21 @@ body {
     gap: 10px;
   }
 
+  .drift-metrics,
+  .card-summary .drift-metrics,
+  .card-drift .drift-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
   .predictions-table {
     font-size: 0.8rem;
+  }
+
+  .preset-buttons {
+    flex-direction: column;
   }
 }

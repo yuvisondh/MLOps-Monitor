@@ -14,10 +14,30 @@ import {
 import './App.css'
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:5001'
-const DEFAULT_V_VALUES = Array(28).fill(0).join(', ')
-const HEALTH_RETRY_DELAYS_MS = [0, 2000, 5000]
+const WAKE_RETRY_DELAYS_MS = [0, 3000, 6000, 10000, 15000, 20000]
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+
+const SAMPLE_TRANSACTIONS = [
+  {
+    name: 'Legitimate — Small Purchase',
+    time: '09:51',
+    amount: '31.00',
+    v: '1.3996, -0.5907, 0.1686, -1.0300, -0.5398, 0.0404, -0.7126, 0.0023, -0.9717, 0.7568, 0.5438, 0.1125, 1.0754, -0.2458, 0.1805, 1.7699, -0.5332, -0.5333, 1.1922, 0.2129, 0.1024, 0.1683, -0.1666, -0.8102, 0.5051, -0.2323, 0.0114, 0.0046',
+  },
+  {
+    name: 'Suspicious — Unusual Pattern',
+    time: '22:25',
+    amount: '1.50',
+    v: '-0.4321, 1.6479, -1.6694, -0.3495, 0.7858, -0.6306, 0.2770, 0.5860, -0.4847, -1.3766, -1.3283, 0.2236, 1.1326, -0.5509, 0.6166, 0.4980, 0.5022, 0.9813, 0.1013, -0.2446, 0.3589, 0.8737, -0.1786, -0.0172, -0.2074, -0.1578, -0.2374, 0.0019',
+  },
+  {
+    name: 'Fraud — High-Risk Transaction',
+    time: '11:31',
+    amount: '364.19',
+    v: '-16.5265, 8.5850, -18.6499, 9.5056, -13.7938, -2.8324, -16.7017, 7.5173, -8.5071, -14.1102, 5.2992, -10.8340, 1.6711, -9.3739, 0.3608, -9.8992, -19.2363, -8.3986, 3.1017, -1.5149, 1.1907, -1.1277, -2.3586, 0.6735, -1.4137, -0.4628, -2.0186, -1.0428',
+  },
+]
 
 function App() {
   const [predictions, setPredictions] = useState([])
@@ -25,16 +45,26 @@ function App() {
   const [summaryData, setSummaryData] = useState(null)
   const [health, setHealth] = useState(false)
   const [apiError, setApiError] = useState('')
-  const [formTime, setFormTime] = useState('00:30')
-  const [formAmount, setFormAmount] = useState('50')
-  const [formVValues, setFormVValues] = useState(DEFAULT_V_VALUES)
+  const [formTime, setFormTime] = useState(SAMPLE_TRANSACTIONS[0].time)
+  const [formAmount, setFormAmount] = useState(SAMPLE_TRANSACTIONS[0].amount)
+  const [formVValues, setFormVValues] = useState(SAMPLE_TRANSACTIONS[0].v)
   const [lastPrediction, setLastPrediction] = useState(null)
+  const [wakeStatus, setWakeStatus] = useState('connecting') // 'connecting' | 'online' | 'offline'
+  const [wakeAttempt, setWakeAttempt] = useState(0)
+
+  const loadPreset = (preset) => {
+    setFormTime(preset.time)
+    setFormAmount(preset.amount)
+    setFormVValues(preset.v)
+  }
 
   const fetchHealthWithRetry = async () => {
-    for (const delayMs of HEALTH_RETRY_DELAYS_MS) {
+    for (let i = 0; i < WAKE_RETRY_DELAYS_MS.length; i++) {
+      const delayMs = WAKE_RETRY_DELAYS_MS[i]
       if (delayMs > 0) {
         await sleep(delayMs)
       }
+      setWakeAttempt(i + 1)
 
       try {
         const healthRes = await axios.get(`${API_BASE}/health`, { timeout: 10000 })
@@ -42,7 +72,7 @@ function App() {
           return true
         }
       } catch {
-        // Keep retrying; Render can take time to wake from cold start.
+        // Render free tier can take up to 60s to wake from cold start.
       }
     }
 
@@ -51,13 +81,14 @@ function App() {
 
   const fetchDashboardData = useCallback(async () => {
     setApiError('')
+    setWakeStatus('connecting')
 
     const isHealthy = await fetchHealthWithRetry()
     setHealth(isHealthy)
+    setWakeStatus(isHealthy ? 'online' : 'offline')
 
     if (!isHealthy) {
-      setApiError('API is offline or waking up. Try again in a few seconds.')
-      setHealth(false)
+      setApiError('API could not be reached. It may still be waking up — try refreshing in 30 seconds.')
       return
     }
 
@@ -158,45 +189,31 @@ function App() {
         </span>
       </div>
 
-      {apiError && <p className="error-banner">{apiError}</p>}
-
-      <section className="card">
-        <h2>Quick Prediction</h2>
-        <form className="prediction-form" onSubmit={submitPrediction}>
-          <div className="form-grid">
-            <label>
-              Transaction Time (24h)
-              <input type="time" value={formTime} onChange={e => setFormTime(e.target.value)} />
-            </label>
-            <label>
-              Amount
-              <input type="number" value={formAmount} onChange={e => setFormAmount(e.target.value)} />
-            </label>
+      {wakeStatus === 'connecting' && (
+        <div className="wake-banner">
+          <div className="wake-spinner" />
+          <div>
+            <strong>Waking up the API...</strong>
+            <p>The backend runs on Render's free tier and sleeps after inactivity. This usually takes 30–60 seconds. (Attempt {wakeAttempt}/{WAKE_RETRY_DELAYS_MS.length})</p>
           </div>
-          <p className="time-help-text">
-            Model Time value sent: {(() => {
-              const [h = '0', m = '0'] = (formTime || '00:00').split(':')
-              return (Number(h) * 3600) + (Number(m) * 60)
-            })()} seconds
-          </p>
-          <label>
-            V1-V28 (comma-separated)
-            <textarea
-              rows="3"
-              value={formVValues}
-              onChange={e => setFormVValues(e.target.value)}
-            />
-          </label>
-          <button type="submit">Run Prediction</button>
-        </form>
-        {lastPrediction && (
-          <div className="prediction-result">
-            <strong>Latest Result:</strong> {lastPrediction.label} ({(lastPrediction.confidence * 100).toFixed(2)}%)
-          </div>
-        )}
-      </section>
+        </div>
+      )}
 
-      <section className="card">
+      {wakeStatus === 'offline' && (
+        <div className="error-banner">
+          <strong>Could not reach the API.</strong> The Render backend may still be starting. Click <button className="inline-link-btn" onClick={fetchDashboardData}>Retry</button> or refresh in 30 seconds.
+        </div>
+      )}
+
+      {apiError && wakeStatus !== 'offline' && <p className="error-banner">{apiError}</p>}
+
+      {wakeStatus === 'online' && predictions.length === 0 && (
+        <div className="info-banner">
+          <strong>Welcome!</strong> This is a live MLOps fraud-detection pipeline. The API is online — use the presets below to submit sample transactions and watch the dashboard populate with predictions, confidence charts, and drift analysis.
+        </div>
+      )}
+
+      <section className="card card-summary">
         <h2>Model Summary</h2>
         {summaryData ? (
           <div className="drift-metrics">
@@ -218,35 +235,7 @@ function App() {
         )}
       </section>
 
-      <section className="card">
-        <h2>Recent Predictions</h2>
-        <table className="predictions-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Time</th>
-              <th>Label</th>
-              <th>Amount</th>
-              <th>Confidence</th>
-            </tr>
-          </thead>
-          <tbody>
-            {predictions.slice(0, 20).map(pred => (
-              <tr key={pred.id}>
-                <td>{pred.id}</td>
-                <td>{new Date(pred.timestamp).toLocaleString()}</td>
-                <td className={pred.label === 'fraud' ? 'label-fraud' : 'label-legit'}>
-                  {pred.label}
-                </td>
-                <td>${pred.amount?.toFixed(2)}</td>
-                <td>{(pred.confidence * 100).toFixed(1)}%</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-
-      <section className="card">
+      <section className="card card-drift">
         <h2>Data Drift Status</h2>
         {driftData ? (
           <>
@@ -271,12 +260,92 @@ function App() {
             </div>
           </>
         ) : (
-          <p style={{ color: 'var(--color-text-secondary)' }}>
+          <p style={{ color: '#64748b' }}>
             Not enough predictions yet — send at least 10 transactions to enable drift detection.
           </p>
         )}
       </section>
-      <section className="card">
+
+      <section className="card card-predict">
+        <h2>Quick Prediction</h2>
+
+        <div className="preset-buttons">
+          {SAMPLE_TRANSACTIONS.map((preset, idx) => (
+            <button
+              key={idx}
+              type="button"
+              className={`preset-btn preset-btn-${idx}`}
+              onClick={() => loadPreset(preset)}
+            >
+              {preset.name}
+            </button>
+          ))}
+        </div>
+
+        <form className="prediction-form" onSubmit={submitPrediction}>
+          <div className="form-grid">
+            <label>
+              Transaction Time (24h)
+              <input type="time" value={formTime} onChange={e => setFormTime(e.target.value)} />
+            </label>
+            <label>
+              Amount ($)
+              <input type="number" value={formAmount} onChange={e => setFormAmount(e.target.value)} />
+            </label>
+          </div>
+          <details className="v-details">
+            <summary>Advanced: V1–V28 PCA features</summary>
+            <p className="v-help-text">
+              These are PCA-transformed features from the original credit card dataset. Use a preset above or enter 28 comma-separated values.
+            </p>
+            <textarea
+              rows="3"
+              value={formVValues}
+              onChange={e => setFormVValues(e.target.value)}
+            />
+          </details>
+          <button type="submit" disabled={!health}>
+            {health ? 'Run Prediction' : 'Waiting for API...'}
+          </button>
+        </form>
+        {lastPrediction && (
+          <div className="prediction-result">
+            <strong>Latest Result:</strong> {lastPrediction.label} ({(lastPrediction.confidence * 100).toFixed(2)}%)
+          </div>
+        )}
+      </section>
+
+      <section className="card card-table">
+        <h2>Recent Predictions</h2>
+        <div className="table-scroll">
+          <table className="predictions-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Time</th>
+                <th>Label</th>
+                <th>Amount</th>
+                <th>Confidence</th>
+              </tr>
+            </thead>
+            <tbody>
+              {predictions.slice(0, 20).map(pred => (
+                <tr key={pred.id}>
+                  <td>{pred.id}</td>
+                  <td>{new Date(pred.timestamp).toLocaleString()}</td>
+                  <td className={pred.label === 'fraud' ? 'label-fraud' : 'label-legit'}>
+                    {pred.label}
+                  </td>
+                  <td>${pred.amount?.toFixed(2)}</td>
+                  <td>{(pred.confidence * 100).toFixed(1)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="card card-chart-line">
         <h2>Confidence Over Time</h2>
         <div className="chart-wrapper">
           <ResponsiveContainer width="100%" height="100%">
@@ -306,7 +375,7 @@ function App() {
         </div>
       </section>
 
-      <section className="card">
+      <section className="card card-chart-bar">
         <h2>Confidence Histogram</h2>
         <div className="chart-wrapper">
           <ResponsiveContainer width="100%" height="100%">
